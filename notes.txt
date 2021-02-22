@@ -1,0 +1,558 @@
+React Wrap Up
+______________________________________________________
+01 useCallback Hook 
+______________________________________________________
+
+There was a lot of content about hooks and redux and react 
+
+Most of the learning came from the projects and reading the solutions 
+It is not the easiest thing to learn , most of the important things is writing larger apps and components that you are working with 
+
+There are two built in hooks that are simple but did not fit into their own sections 
+
+React
+-props,state,effects,router,redux
+
+useCallback is a hook that returns a memoized something 
+
+memoization is being able to save something for reuse later like cacheing 
+
+You have a function you want to call inside of an effect that depends on props or state 
+since it depends on props state it should be listed as a dependency 
+
+we can end up in some crazy call back cycle with the following code 
+
+    const [num,setNum] = useState(initialNum);
+    const [fact,setFact] = useState("");
+    async function getFact(newNum) {
+        console.log("Running")
+        let response = await axios.get(`${baseUrl}${newNum}?json`);
+        setNum(newNum);
+        setFact(response.data.text);
+    }
+
+    // useEffect(() => {getFact(initialNum)}, [getFact,initialNum]);
+    useEffect(() => getFact(num),[num,getFact])
+
+the reason becing that the code is going to remake the getFact function everytime the component renders 
+
+so you end up with a cycle everytime the component runs 
+
+so this can make several api calls over and over 
+the problem is that our component is changing over and over and over 
+
+this reminds me of the drawing a card cycle that made me go crazy
+
+we cna use useCallback to use it 
+
+we pass in a function and an array of dependencies to figure out when the callback should change if it should ever change 
+
+______________________________________________________
+02_memo
+______________________________________________________
+
+memo is related to functional components alongside useCallback
+
+in our simple example we can see that the parent and the child are rerendering every time that the count state is being updated 
+
+and this is the expected behavior because the parent is rerendering 
+
+but its kind of a waste 
+
+why rerender it when we dont have anything changing 
+
+this example might not be common but you might have child components in another app that stay the same when a state changes in a parent 
+
+we can use a method from react called memo that will allow us prevent rerendering when our component takes the same props 
+
+
+so we have this 
+
+import React from 'react';
+
+const Child = () => {
+    console.log("re-render child component")
+    return(
+        <div>
+            <p>I am a child component</p>
+        </div>
+    )
+}
+
+export default Child;
+
+and we update to this 
+
+import React,{memo} from 'react';
+
+const Child = memo(() => {
+    console.log("re-render child component")
+    return(
+        <div>
+            <p>I am a child component</p>
+        </div>
+    )
+})
+
+export default Child;
+
+and aside from the initial render we no longer rerender the child components 
+unless we get different props 
+
+and this removal of unecessary renders helps us boost performance 
+
+so if we make it so that the color is based on whether the count is odd or even 
+
+import React, {useState} from 'react';
+import Child from './Child';
+
+const Parent = () => {
+    const [count,setCount] = useState(0);
+    console.log("Parent Rendering");
+    const color = count % 2 === 0 ? 'red':'purple';
+    return (
+        <main>
+            <p>Count: {count}</p>
+            <button onClick={() => setCount(count => (count + 1))}>Increment</button>
+            <Child color={color}/>
+            <Child />
+            <Child color="orange" />
+        </main>
+    )
+}
+export default Parent;
+
+we can see that only the component getting a new prop is actually changing 
+
+______________________________________________________
+memo and useCallback
+______________________________________________________
+in the previous video we saw a method we can wrap around a functional component to prevent a rerender 
+
+in the child component we want to make it so we can reset the parent component to update the state in the parent 
+
+now by adding the reset function into our children as a prop 
+we are getting a new version of reset everytime our parent renders which is technically a different prop when passed down to the children 
+
+so this is where useCallback comes in 
+
+useCallback is going to memoize a function for us 
+memo method is what we wrap around a whole component 
+
+but we are going to use useCallback to make it so that we get only one version of reset 
+
+    const reset = useCallback(() => {
+        setCount(0)
+    },[setCount])
+
+so now unless our setCount dependency changes we wont be changing the props 
+so we will not get rerenders 
+
+import React, {useState,useCallback} from 'react';
+import Child from './Child';
+
+const Parent = () => {
+    const [count,setCount] = useState(0);
+    console.log("Parent Rendering");
+    // const color = count % 2 === 0 ? 'red':'purple';
+    const reset = useCallback(() => {
+        setCount(0)
+    },[setCount])
+    return (
+        <main>
+            <p>Count: {count}</p>
+            <button onClick={() => setCount(count => (count + 1))}>Increment</button>
+            <Child reset={reset}/>
+            <Child reset={reset} />
+            <Child reset={reset} color="orange" />
+        </main>
+    )
+}
+export default Parent;
+
+import React,{memo} from 'react';
+
+const Child = memo(({color="lilac",reset}) => {
+    console.log("re-render child component")
+    
+    return(
+        <div>
+            <p >I am a child component</p>
+            <button onClick={reset}>Reset Count (in parent)</button>
+        </div>
+    )
+})
+
+export default Child;
+
+so now we are preventing all the child rerenders 
+
+______________________________________________________
+useMemo
+______________________________________________________
+
+similar to use callback , its  abuilt in hook 
+
+it will memoize something like a value other than functions 
+
+accepts a function and has a dependencies argument as well 
+
+we put in a get divisors component and it is running twice and we can see that it rerenders whenever the setNum or setFact is called 
+
+we can use useMemo inside the NumberDivisors 
+useMemo is going to memoize a value that is not a function
+
+adding it in looks liek thi9s 
+
+let divisors = useMemo(() => getDivisors(num),[num])
+
+we pass in the value that we are going to want to get and only update it once the num changes 
+
+______________________________________________________
+useReducer
+______________________________________________________
+Redux without redux 
+
+we can implement our own version of redux without having to actually use redux 
+
+lets you use reducers without redux 
+
+we call useReducer and we pass in a reducer function that accepts state and action 
+
+useReducer and useContext allows us to sort of recreate redux 
+we would have useReducer higher in the component higher 
+
+the actual file code is very similar to the way redux works except instead of using useState we use useReducer and provide context 
+
+the docs will recommend that we seperate the dispatch into its own context 
+
+state changes frequently but dispatch never does so having a seperate dispatch provider avoids having a ton of unecessary rerenders
+
+so that dispatch provider only passes around the dispatch functionality 
+
+______________________________________________________
+Webpack
+______________________________________________________
+
+a tool that we have been using but we havent done anything to use it 
+
+cra comes configured with webpack 
+
+webpack lets you use JS modules so we can import and export code 
+webpack combines your js into one file 
+makes sure everything is in the right order 
+
+makes sure all of that stuff is imported and added into that bundle 
+it is also how we are able to import css 
+
+webpack plays a very important role in a lot of js stuff 
+
+youtube course to set up webpack from scratch 
+
+with CRA there is no reason really to configure out your own 
+there is a webpack getting started guide 
+
+you will be thankful that CRA exists 
+
+webpack can be frustrating and tricky to set up 
+
+______________________________________________________
+Prop Types
+______________________________________________________
+
+There are a couple of useful add ons that we need to cover 
+
+proptypes is a library/package we can install that works with react 
+
+we can verify that types of props are as expected 
+
+if pass a number in when a string is expected it is similar to checking types
+prop types used to be part of react core module 
+
+we have a different app to demonstrate how to use this 
+
+so we import it in and then we set it at the bottom of a component 
+
+we can check for multiple things 
+
+can check if something is some of many acceptable types 
+
+import React from 'react';
+import PropTypes from 'prop-types'
+
+const Person = (props) => {
+    return(
+        <div>
+            <p>Name is : {props.name}</p>
+            <p>Age is : {props.age}</p>
+        </div>
+    )
+}
+
+Person.propTypes = {
+    name:PropTypes.string,
+    age:PropTypes.number
+  }
+
+  
+export default Person;
+
+
+the lowercase propTypes is just a variable name we are setting that is not coming from the package 
+
+but if we look at our console and we had passed in an unexpected prop type there will be an error in our console 
+
+there are ways to run prop type checks before our code runs 
+
+its just a way to set up some expectations for our components to make sure that they are what we expect them to be 
+
+______________________________________________________
+Styled components
+______________________________________________________
+
+can make css wrapped components for your components 
+
+npm install styled-components
+
+instead of having to write a bunch of css components 
+we can use styled components to write our css instead of having a bunch of files 
+
+but its written as giant strings 
+
+the string is a string template literal really popular with a lot of comapnies 
+
+we install and then we import it 
+
+import styled from 'styled-components';
+
+const Header = styled.h1`
+color:purple;,
+font-size:50px;,
+border: 2px solid pink;
+`
+
+and then this makes us a component called Header 
+a jsx component that we can now use 
+
+<Header>Hello</Header>
+
+then we can now just render it like any component and our styles will be applied 
+
+we dont need a style sheet but the core idea here is that we can also have dynamic styling with props 
+
+const Header = styled.h1`
+color:purple;,
+font-size: ${props => props.isSuperBig ? '100px' : '50px'};,
+border: 2px solid pink;
+`
+
+like this 
+
+so now if our Header component has that then we render it at 100 px else just 50 
+
+      <Header isSuperBig>Hello</Header>
+      <Header >Hello</Header>
+
+    
+import './App.css';
+import Person from './Person';
+import styled from 'styled-components';
+
+const Header = styled.h1`
+color:purple;
+font-size: ${props => props.isSuperBig ? '100px' : '50px'};
+border: 2px solid pink;
+`
+function App() {
+  return (
+    <div className="App">
+      <header className="App-header">
+      <Header isSuperBig>Hello</Header>
+      <Header >Hello</Header>
+      <Person age={49} name='Bojack'/>
+      </header>
+    </div>
+  );
+}
+
+
+
+
+
+export default App;
+
+
+we can pass in components to give it styling 
+we can extend styling from other components 
+
+const ResponsiveHeader = styled(Header)`
+  font-size: 10vw;
+
+`
+function App() {
+  return (
+    <div className="App">
+      <header className="App-header">
+      <Header isSuperBig>Hello</Header>
+      <Header >Hello</Header>
+      <ResponsiveHeader >Hello I am responsive</ResponsiveHeader>
+      <Person age={49} name='Bojack'/>
+      </header>
+    </div>
+  );
+}
+
+so it has the same styling but it also has the responsiveness that we are adding 
+
+the custom style is scoped to the one component that we are making so if we have another h1 somewhere in our app it wont matter because we are creating a new component 
+
+we can use pseudo styles and selectors so we can make a dynamix hover color 
+
+import './App.css';
+import Person from './Person';
+import styled from 'styled-components';
+
+const Header = styled.h1`
+color:purple;
+font-size: ${props => props.isSuperBig ? '100px' : '50px'};
+border: 2px solid pink;
+`
+
+const ResponsiveHeader = styled(Header)`
+  font-size: 10vw;
+
+`
+
+const Hover = styled.button`
+padding:2rem;
+background-color:teal;
+&:hover{
+  background-color:pink
+}
+`
+function App() {
+  return (
+    <div className="App">
+      <header className="App-header">
+      <Header isSuperBig>Hello</Header>
+      <Header >Hello</Header>
+      <ResponsiveHeader >Hello I am responsive</ResponsiveHeader>
+      <Hover>HOVER!</Hover>
+      <Person age={49} name='Bojack'/>
+      </header>
+    </div>
+  );
+}
+
+
+
+
+
+export default App;
+
+
+const Hover = styled.button`
+padding:2rem;
+background-color:teal;
+&:hover{
+  background-color:${props => props.hoverColor}
+}
+`
+      <Hover hoverColor = "orange">HOVER!</Hover>
+      <Hover hoverColor = "silver">HOVER!</Hover>
+
+and so here we made super easy dynamic props 
+
+really common and we will probably see this in code bases
+pretty standard to use styled components 
+
+we can do animations and stuff 
+there is a lot 
+you can write themes work with refs 
+you can refer to other components 
+
+______________________________________________________
+Material UI 
+______________________________________________________
+
+material ui is a popular component library for react 
+
+react-strap is another
+
+material ui is based off of googles material design 
+
+it gives you a bunch of prestyled stuff 
+
+npm install @material-ui/core
+
+every component will have a demo and where to import it from 
+
+there are variants and different sets of colors 
+
+you can customize and set up your themes 
+
+and you can override things and customize your components 
+
+lets start with a button 
+
+import React from 'react';
+import Button from '@material-ui/core/Button';
+
+const Playground = () => {
+
+    return(
+        <div>
+            <Button color='secondary' variant ='contained'>Click me</Button>
+        </div>
+    )
+}
+
+export default Playground;
+
+there are a ton of stuff and we can open up the source code and then we import it in 
+we would have to install icon library to use the icons with it 
+
+import React, {useState} from 'react';
+import Button from '@material-ui/core/Button';
+import Select from '@material-ui/core/Select';
+import InputLabel from '@material-ui/core/InputLabel';
+import MenuItem from '@material-ui/core/MenuItem';
+
+const Playground = () => {
+    const [color,setColor] = useState('Green')
+    return(
+        <div>
+            <Button color='secondary' variant ='contained'>Click me</Button>
+            <Select value={color} onChange = {(e) => setColor(e.target.value)}>
+                <MenuItem value="Red">Red</MenuItem>
+                <MenuItem value="Blue">Blue</MenuItem>
+                <MenuItem value="Orange">Orange</MenuItem>
+                <MenuItem value="Yellow">Yellow</MenuItem>
+                <MenuItem value="Green">Green</MenuItem>
+            </Select>
+        </div>
+    )
+}
+
+export default Playground;
+
+there are sliders switches toggles 
+
+there are grid and layout component to arrange things in a grid 
+
+take a look at the docs if we want to use the grid system 
+
+laying things out can be a little painful 
+
+drawer is a cool component for navigation 
+
+each drawer needs to have a prop called open 
+
+we have menus
+
+
+stepper components 
+
+App bars 
+are a nice feature 
+
